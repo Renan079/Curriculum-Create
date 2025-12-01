@@ -1,7 +1,7 @@
 <?php
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\ItemController;
+use App\Http\Controllers\ResumeController;
 
 /*
 |--------------------------------------------------------------------------
@@ -19,5 +19,6 @@ Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
     return $request->user();
 });
 
-// ROTAS DO SEU NOVO RECURSO 'ITEM' <-- ADICIONE ESTA LINHA
-Route::apiResource('items', ItemController::class);
+Route::get('/resumes/{id}', [ResumeController::class, 'show']);
+
+Route::put('/resumes/{id}', [ResumeController::class, 'update']);

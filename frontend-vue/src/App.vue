@@ -1,17 +1,16 @@
 <script setup lang="ts">
-// Importamos o componente que acabamos de criar
 import ResumeEditor from './components/ResumeEditor.vue';
+import LoginView from './components/LoginView.vue';
+import useResumeStore from './stores/resume';
+
+const store = useResumeStore();
 </script>
 
 <template>
-  <ResumeEditor />
+  <ResumeEditor v-if="store.token" />
+  <LoginView v-else />
 </template>
 
 <style>
-/* Removemos as margens padrão do navegador para o editor ocupar 100% da tela */
-body {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
+body { margin: 0; padding: 0; box-sizing: border-box; }
 </style>

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Resume;
 use Illuminate\Http\Request;
+use Spatie\Browsershot\Browsershot;
 
 class ResumeController extends Controller
 {
@@ -24,27 +25,60 @@ class ResumeController extends Controller
 
     public function update(Request $request, $id)
     {
-        // 1. Acha o currículo
         $resume = Resume::findOrFail($id);
-
-        // 2. Atualiza os dados básicos do currículo (Título, Cor, Fonte...)
-        // O método 'only' pega apenas os campos permitidos para evitar hackers
         $resume->update($request->only(['title', 'primary_color', 'font_family']));
 
-        // 3. Atualiza as Seções (O Pulo do Gato 🐈)
-        // Como as seções vêm dentro de um array, precisamos percorrer uma por uma
         if ($request->has('sections')) {
             foreach ($request->sections as $sectionData) {
-                // Buscamos a seção pelo ID dela para garantir que estamos editando a certa
-                $section = \App\Models\Section::find($sectionData['id']);
-                
-                if ($section) {
-                    // Atualizamos o conteúdo (JSON) dela
-                    $section->update(['content' => $sectionData['content']]);
-                }
+                // LÓGICA INTELIGENTE:
+                // Se tem 'id', atualiza. Se não tem, cria um novo.
+                $resume->sections()->updateOrCreate(
+                    ['id' => $sectionData['id'] ?? null], // Busca por ID
+                    [
+                        'type' => $sectionData['type'],
+                        'title' => $sectionData['title'],
+                        'content' => $sectionData['content'],
+                        'order_index' => $sectionData['order_index'] ?? 0
+                    ]
+                );
             }
         }
 
-        return response()->json(['message' => 'Currículo salvo com sucesso!']);
+        // Retorna o currículo atualizado (importante para pegar os IDs dos novos itens)
+        return response()->json([
+            'message' => 'Salvo com sucesso!',
+            'resume' => $resume->load(['sections' => fn($q) => $q->orderBy('order_index')])
+        ]);
+    }
+
+    /**
+     * Apaga uma seção específica
+     */
+    public function destroySection($id)
+    {
+        $section = \App\Models\Section::findOrFail($id);
+        $section->delete();
+        return response()->json(['message' => 'Seção removida']);
+    }
+
+
+    public function download($id)
+    {
+        $resume = Resume::with(['sections' => function($query) {
+            $query->orderBy('order_index');
+        }])->findOrFail($id);
+
+        $html = view('pdf.resume', compact('resume'))->render();
+
+        $pdf = Browsershot::html($html)
+            ->format('A4')
+            ->margins(10, 10, 10, 10)
+            ->showBackground()
+            ->noSandbox() // <--- ADICIONE ESTA LINHA AQUI!
+            ->pdf();
+
+        return response()->streamDownload(function () use ($pdf) {
+            echo $pdf;
+        }, 'curriculo.pdf', ['Content-Type' => 'application/pdf']);
     }
 }

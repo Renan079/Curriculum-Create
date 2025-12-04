@@ -35,6 +35,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/resumes/{id}', [ResumeController::class, 'show']);
     Route::put('/resumes/{id}', [ResumeController::class, 'update']);
     Route::delete('/sections/{id}', [ResumeController::class, 'destroySection']);
+
+    Route::get('/my-resumes', [ResumeController::class, 'index']); // Listar
+    Route::post('/resumes', [ResumeController::class, 'store']);   // Criar Novo
+    Route::delete('/resumes/{id}', [ResumeController::class, 'destroy']); // Excluir
     
     // Logout
     Route::post('/logout', [AuthController::class, 'logout']);

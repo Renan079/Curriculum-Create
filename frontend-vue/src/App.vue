@@ -1,14 +1,20 @@
 <script setup lang="ts">
 import ResumeEditor from './components/ResumeEditor.vue';
 import LoginView from './components/LoginView.vue';
+import DashboardView from './components/DashboardView.vue'; // <--- Importamos o novo componente
 import useResumeStore from './stores/resume';
 
 const store = useResumeStore();
 </script>
 
 <template>
-  <ResumeEditor v-if="store.token" />
-  <LoginView v-else />
+  <div v-if="store.token">
+    <ResumeEditor v-if="store.resume" /> <DashboardView v-else />             
+  </div>
+
+  <div v-else>
+    <LoginView />
+  </div>
 </template>
 
 <style>

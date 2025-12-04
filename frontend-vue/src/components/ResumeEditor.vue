@@ -60,11 +60,12 @@ const downloadPdf = async () => {
         </button>
 
         <button 
-            @click="store.logout(); window.location.reload();"
-            class="text-red-500 hover:text-red-700 text-sm font-bold px-3"
+            @click="store.closeEditor()"
+            class="text-gray-500 hover:text-indigo-600 text-sm font-bold px-3 flex items-center gap-1"
         >
-            Sair
+            ⬅ Voltar
         </button>
+        
       </header>
 
       <div v-for="section in store.resume.sections" :key="section.id || section.order_index" class="mb-6 bg-white p-6 rounded-lg shadow-sm border border-gray-200">

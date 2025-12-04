@@ -7,7 +7,52 @@ use Illuminate\Http\Request;
 use Spatie\Browsershot\Browsershot;
 
 class ResumeController extends Controller
-{
+{   
+
+    // LISTAR: Retorna todos os currículos do usuário logado
+    public function index(Request $request)
+    {
+        return $request->user()->resumes()->orderBy('created_at', 'desc')->get();
+    }
+
+    // CRIAR: Gera um novo currículo em branco
+    public function store(Request $request)
+    {
+        $user = $request->user();
+
+        // 1. Cria o currículo
+        $resume = $user->resumes()->create([
+            'title' => $request->title ?? 'Novo Currículo',
+            'template_id' => 'moderno-blue',
+            'primary_color' => '#3b82f6',
+        ]);
+
+        // 2. Adiciona a seção de dados pessoais (puxando do usuário)
+        $resume->sections()->create([
+            'type' => 'personal',
+            'title' => 'Dados Pessoais',
+            'order_index' => 1,
+            'content' => [
+                'full_name' => $user->name,
+                'email' => $user->email,
+                'headline' => '', 'phone' => '', 'city' => ''
+            ]
+        ]);
+
+        return response()->json($resume);
+    }
+
+    // EXCLUIR: Apaga o currículo inteiro
+    public function destroy(Request $request, $id)
+    {
+        // Garante que o currículo pertence ao usuário antes de apagar
+        $resume = $request->user()->resumes()->findOrFail($id);
+        
+        $resume->delete();
+
+        return response()->json(['message' => 'Currículo excluído']);
+    }
+
     /**
      * Retorna o currículo pelo ID, trazendo junto as seções ordenadas.
      */

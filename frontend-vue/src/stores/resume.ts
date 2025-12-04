@@ -2,44 +2,15 @@ import { defineStore } from 'pinia';
 import { ref } from 'vue';
 
 const useResumeStore = defineStore('resume', () => {
-    const resume = ref<any>(null);
+    // --- ESTADOS (State) ---
+    const resume = ref<any>(null);      // O currículo atual sendo editado (Editor)
+    const resumes = ref<any[]>([]);     // A lista de currículos (Dashboard)
     const loading = ref(false);
     const saving = ref(false);
-    
     const token = ref(localStorage.getItem('auth_token') || '');
 
-    // --- FUNÇÃO INTELIGENTE: Descobre qual currículo carregar ---
-    const fetchUserResume = async () => {
-        if (!token.value) return;
-        
-        loading.value = true;
-        try {
-            // 1. Pergunta: "Quais são meus currículos?"
-            const response = await fetch('http://127.0.0.1:8000/api/my-resumes', {
-                headers: { 
-                    'Accept': 'application/json',
-                    'Authorization': `Bearer ${token.value}` 
-                }
-            });
-            
-            if (response.status === 401) { logout(); return; }
+    // --- AÇÕES DE AUTENTICAÇÃO ---
 
-            const resumes = await response.json();
-
-            // 2. Se tiver currículo, carrega o primeiro
-            if (resumes.length > 0) {
-                await fetchResume(resumes[0].id);
-            } else {
-                resume.value = null; // Nenhum currículo encontrado
-            }
-        } catch (error) {
-            console.error("Erro ao buscar lista:", error);
-        } finally {
-            loading.value = false;
-        }
-    };
-
-    // --- AUTENTICAÇÃO ---
     const login = async (email: string, password: string) => {
         loading.value = true;
         try {
@@ -54,12 +25,13 @@ const useResumeStore = defineStore('resume', () => {
                 token.value = data.access_token;
                 localStorage.setItem('auth_token', data.access_token);
                 
-                // MUDANÇA CRUCIAL: Busca o currículo DO USUÁRIO (e não o ID 1)
-                await fetchUserResume();
+                // Ao logar, limpamos o currículo atual para mostrar o Dashboard
+                resume.value = null; 
+                await fetchResumes(); 
             } else {
                 alert(data.message || 'Erro no login');
             }
-        } catch (e) { alert('Erro de conexão'); } 
+        } catch (e) { alert('Erro de conexão'); }
         finally { loading.value = false; }
     };
 
@@ -77,9 +49,9 @@ const useResumeStore = defineStore('resume', () => {
                 token.value = data.access_token;
                 localStorage.setItem('auth_token', data.access_token);
                 
-                // Busca o currículo novo que acabou de ser criado
-                await fetchUserResume();
-                
+                // Ao registrar, vamos para o Dashboard
+                resume.value = null;
+                await fetchResumes();
                 alert('Conta criada com sucesso!');
             } else {
                 alert('Erro ao cadastrar: ' + (data.message || 'Verifique os dados'));
@@ -91,11 +63,65 @@ const useResumeStore = defineStore('resume', () => {
     const logout = () => {
         token.value = '';
         resume.value = null;
+        resumes.value = [];
         localStorage.removeItem('auth_token');
-        window.location.reload(); // Recarrega para voltar ao Login
+        window.location.reload();
     };
 
-    // --- CURRÍCULO (CRUD) ---
+    // --- AÇÕES DO DASHBOARD (MEUS CURRÍCULOS) ---
+
+    const fetchResumes = async () => {
+        if (!token.value) return;
+        loading.value = true;
+        try {
+            const response = await fetch('http://127.0.0.1:8000/api/my-resumes', {
+                headers: { 
+                    'Accept': 'application/json',
+                    'Authorization': `Bearer ${token.value}` 
+                }
+            });
+            
+            if (response.status === 401) { logout(); return; }
+            
+            resumes.value = await response.json();
+        } catch (error) { console.error(error); } 
+        finally { loading.value = false; }
+    };
+
+    const createResume = async (title: string = 'Novo Currículo') => {
+        loading.value = true;
+        try {
+            const response = await fetch('http://127.0.0.1:8000/api/resumes', {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'Authorization': `Bearer ${token.value}` 
+                },
+                body: JSON.stringify({ title })
+            });
+            const newResume = await response.json();
+            // Após criar, abre o editor imediatamente com o novo currículo
+            await fetchResume(newResume.id);
+        } catch (e) { alert('Erro ao criar'); } 
+        finally { loading.value = false; }
+    };
+
+    const deleteResume = async (id: number) => {
+        if (!confirm('Tem certeza? Isso apagará o currículo para sempre.')) return;
+        
+        try {
+            await fetch(`http://127.0.0.1:8000/api/resumes/${id}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${token.value}` }
+            });
+            // Remove da lista local visualmente
+            resumes.value = resumes.value.filter(r => r.id !== id);
+        } catch (e) { alert('Erro ao excluir'); }
+    };
+
+    // --- AÇÕES DO EDITOR (SINGLE RESUME) ---
+
     const fetchResume = async (id: number) => {
         loading.value = true;
         try {
@@ -107,7 +133,7 @@ const useResumeStore = defineStore('resume', () => {
             });
             
             if (response.status === 401 || response.status === 403) { 
-                console.error("Sem permissão para este currículo");
+                console.error("Sem permissão");
                 return; 
             }
 
@@ -117,11 +143,42 @@ const useResumeStore = defineStore('resume', () => {
         finally { loading.value = false; }
     };
 
+    // --- AQUI ESTA A FUNÇÃO QUE FALTAVA ---
+    const fetchUserResume = async () => {
+        if (!token.value) return;
+        
+        loading.value = true;
+        try {
+            // Busca a lista de currículos
+            const response = await fetch('http://127.0.0.1:8000/api/my-resumes', {
+                headers: { 
+                    'Accept': 'application/json',
+                    'Authorization': `Bearer ${token.value}` 
+                }
+            });
+            
+            if (response.status === 401) { logout(); return; }
+
+            const data = await response.json();
+
+            // Se tiver currículo, carrega o primeiro
+            if (data.length > 0) {
+                await fetchResume(data[0].id);
+            } else {
+                resume.value = null; // Nenhum currículo encontrado
+            }
+        } catch (error) {
+            console.error("Erro ao buscar lista:", error);
+        } finally {
+            loading.value = false;
+        }
+    };
+
     const saveResume = async () => {
         if (!resume.value) return;
         saving.value = true;
         try {
-            await fetch(`http://127.0.0.1:8000/api/resumes/${resume.value.id}`, {
+            const response = await fetch(`http://127.0.0.1:8000/api/resumes/${resume.value.id}`, {
                 method: 'PUT',
                 headers: { 
                     'Content-Type': 'application/json',
@@ -130,10 +187,20 @@ const useResumeStore = defineStore('resume', () => {
                 },
                 body: JSON.stringify(resume.value)
             });
-            alert('Salvo com sucesso!');
+            
+            if (response.ok) {
+                alert('Salvo com sucesso!');
+            }
         } catch (error) { alert('Erro ao salvar'); } 
         finally { saving.value = false; }
     };
+
+    const closeEditor = () => {
+        resume.value = null; // Fecha o editor
+        fetchResumes(); // Atualiza o dashboard com dados novos se houver
+    };
+
+    // --- MANIPULAÇÃO DE SEÇÕES ---
 
     const addSection = (type: string) => {
         let newContent = {};
@@ -158,14 +225,24 @@ const useResumeStore = defineStore('resume', () => {
                 headers: { 'Authorization': `Bearer ${token.value}` }
             });
         }
-        resume.value.sections = resume.value.sections.filter((s: any) => s !== section);
+        if (resume.value) {
+            resume.value.sections = resume.value.sections.filter((s: any) => s !== section);
+        }
     };
 
+    // --- RETORNO (EXPORTAÇÃO) ---
     return { 
-        resume, loading, saving, token, 
+        // Estados
+        resume, resumes, loading, saving, token, 
+        // Auth
         login, register, logout, 
-        fetchResume, saveResume, addSection, removeSection, 
-        fetchUserResume // IMPORTANTE: Exportando para usar no Editor
+        // Dashboard
+        fetchResumes, createResume, deleteResume,
+        // Editor
+        fetchResume, saveResume, closeEditor, 
+        fetchUserResume, // <--- AGORA VAI FUNCIONAR POIS A FUNÇÃO EXISTE ACIMA
+        // Seções
+        addSection, removeSection 
     };
 });
 

@@ -108,17 +108,31 @@ const useResumeStore = defineStore('resume', () => {
     };
 
     const deleteResume = async (id: number) => {
-        if (!confirm('Tem certeza? Isso apagará o currículo para sempre.')) return;
+    if (!confirm('Tem certeza? Isso apagará o currículo para sempre.')) return;
+    
+    try {
+        const response = await fetch(`http://127.0.0.1:8000/api/resumes/${id}`, {
+            method: 'DELETE',
+            headers: { 
+                'Authorization': `Bearer ${token.value}`,
+                'Accept': 'application/json' // Importante para o Laravel retornar JSON se der erro
+            }
+        });
+
+        // VERIFICAÇÃO CRÍTICA ADICIONADA
+        if (!response.ok) {
+            // Se o status for 4xx ou 5xx, forçamos o erro
+            throw new Error('Falha na resposta do servidor');
+        }
+
+        // Só remove da tela se o servidor confirmou que apagou (ou deu 200/204)
+        resumes.value = resumes.value.filter(r => r.id !== id);
         
-        try {
-            await fetch(`http://127.0.0.1:8000/api/resumes/${id}`, {
-                method: 'DELETE',
-                headers: { 'Authorization': `Bearer ${token.value}` }
-            });
-            // Remove da lista local visualmente
-            resumes.value = resumes.value.filter(r => r.id !== id);
-        } catch (e) { alert('Erro ao excluir'); }
-    };
+    } catch (e) { 
+        console.error(e); // Bom para você ver o erro real no console (F12)
+        alert('Erro ao excluir. Verifique o console.'); 
+    }
+};
 
     // --- AÇÕES DO EDITOR (SINGLE RESUME) ---
 

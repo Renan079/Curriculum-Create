@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Resume;
 use Illuminate\Http\Request;
 use Spatie\Browsershot\Browsershot;
+use Barryvdh\DomPDF\Facade\Pdf;
 
 class ResumeController extends Controller
 {   
@@ -107,23 +108,40 @@ class ResumeController extends Controller
     }
 
 
+//    public function download($id)
+//   {
+//        $resume = Resume::with(['sections' => function($query) {
+//           $query->orderBy('order_index');
+//        }])->findOrFail($id);
+//
+//        $html = view('pdf.resume', compact('resume'))->render();
+//
+//        $pdf = Browsershot::html($html)
+//            ->format('A4')
+//            ->margins(10, 10, 10, 10)
+//            ->showBackground()
+//            ->noSandbox() // <--- ADICIONE ESTA LINHA AQUI!
+ //           ->pdf();
+//
+//        return response()->streamDownload(function () use ($pdf) {
+//            echo $pdf;
+ //       }, 'curriculo.pdf', ['Content-Type' => 'application/pdf']);
+//    }   
+
     public function download($id)
     {
+        // Carrega o currículo com as seções ordenadas
         $resume = Resume::with(['sections' => function($query) {
-            $query->orderBy('order_index');
+            $query->orderBy('order_index', 'asc');
         }])->findOrFail($id);
 
-        $html = view('pdf.resume', compact('resume'))->render();
+        // REMOVA OU COMENTE ESTA LINHA:
+        //  dd($resume->sections->toArray()); 
 
-        $pdf = Browsershot::html($html)
-            ->format('A4')
-            ->margins(10, 10, 10, 10)
-            ->showBackground()
-            ->noSandbox() // <--- ADICIONE ESTA LINHA AQUI!
-            ->pdf();
+        $pdf = Pdf::loadView('pdfs.resume-moderno', ['resume' => $resume]);
+        $pdf->setPaper('a4', 'portrait');
 
-        return response()->streamDownload(function () use ($pdf) {
-            echo $pdf;
-        }, 'curriculo.pdf', ['Content-Type' => 'application/pdf']);
+        return $pdf->download("curriculo-{$id}.pdf");
     }
+
 }

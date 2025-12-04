@@ -51,9 +51,16 @@ onMounted(() => {
             </div>
             
             <div class="p-4 flex-1 flex flex-col justify-between">
-                <div>
+                <div class="flex flex-col gap-2">
                     <h3 class="font-bold text-gray-800 truncate">{{ resume.title }}</h3>
                     <p class="text-xs text-gray-500">Atualizado recentemente</p>
+                    <a 
+                        :href="`http://127.0.0.1:8000/resumes/${resume.id}/download`" 
+                        target="_blank"
+                        class="bg-green-600 text-white px-2 py-1 rounded hover:bg-green-700"
+                    >
+                        Baixar PDF
+                    </a>
                 </div>
                 
                 <div class="flex justify-between items-center mt-4">
@@ -63,8 +70,10 @@ onMounted(() => {
                     >
                         Editar
                     </button>
+
+
                     <button 
-                        @click="store.deleteResume(resume.id)"
+                        type="button"  @click="store.deleteResume(resume.id)"
                         class="text-red-400 hover:text-red-600 text-sm"
                     >
                         Excluir

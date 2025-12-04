@@ -72,11 +72,13 @@ class ResumeController extends Controller
     public function update(Request $request, $id)
     {
         $resume = Resume::findOrFail($id);
-        $resume->update($request->only(['title', 'primary_color', 'font_family']));
+
+        // --- MUDANÇA AQUI: Adicionei 'template_id' na lista ---
+        $resume->update($request->only(['title', 'template_id', 'primary_color', 'font_family']));
 
         if ($request->has('sections')) {
             foreach ($request->sections as $sectionData) {
-                // LÓGICA INTELIGENTE:
+                // LÓGICA INTELIGENTE (Mantida):
                 // Se tem 'id', atualiza. Se não tem, cria um novo.
                 $resume->sections()->updateOrCreate(
                     ['id' => $sectionData['id'] ?? null], // Busca por ID
@@ -90,7 +92,7 @@ class ResumeController extends Controller
             }
         }
 
-        // Retorna o currículo atualizado (importante para pegar os IDs dos novos itens)
+        // Retorna o currículo atualizado
         return response()->json([
             'message' => 'Salvo com sucesso!',
             'resume' => $resume->load(['sections' => fn($q) => $q->orderBy('order_index')])
@@ -107,38 +109,26 @@ class ResumeController extends Controller
         return response()->json(['message' => 'Seção removida']);
     }
 
-
-//    public function download($id)
-//   {
-//        $resume = Resume::with(['sections' => function($query) {
-//           $query->orderBy('order_index');
-//        }])->findOrFail($id);
-//
-//        $html = view('pdf.resume', compact('resume'))->render();
-//
-//        $pdf = Browsershot::html($html)
-//            ->format('A4')
-//            ->margins(10, 10, 10, 10)
-//            ->showBackground()
-//            ->noSandbox() // <--- ADICIONE ESTA LINHA AQUI!
- //           ->pdf();
-//
-//        return response()->streamDownload(function () use ($pdf) {
-//            echo $pdf;
- //       }, 'curriculo.pdf', ['Content-Type' => 'application/pdf']);
-//    }   
-
-    public function download($id)
+   public function download($id)
     {
-        // Carrega o currículo com as seções ordenadas
         $resume = Resume::with(['sections' => function($query) {
             $query->orderBy('order_index', 'asc');
         }])->findOrFail($id);
 
-        // REMOVA OU COMENTE ESTA LINHA:
-        //  dd($resume->sections->toArray()); 
+        // --- LÓGICA DE SELEÇÃO INTELIGENTE ---
+        // Mapeia tanto nomes quanto IDs para os arquivos corretos
+        $templateFile = match ($resume->template_id) {
+            // Se for 2 ou estiver escrito 'classico' -> Carrega o Clássico
+            2, '2', 'classico', 'classic' => 'pdfs.resume-classico',
+            
+            // Se for 3 ou 'minimalista' -> Carrega o Minimalista (futuro)
+            3, '3', 'minimalista' => 'pdfs.resume-minimalista',
+            
+            // Padrão (cobre 'moderno-blue', 1, null, etc) -> Carrega o Moderno
+            default => 'pdfs.resume-moderno',
+        };
 
-        $pdf = Pdf::loadView('pdfs.resume-moderno', ['resume' => $resume]);
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView($templateFile, ['resume' => $resume]);
         $pdf->setPaper('a4', 'portrait');
 
         return $pdf->download("curriculo-{$id}.pdf");

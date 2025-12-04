@@ -2,6 +2,7 @@
 import { onMounted } from 'vue';
 import useResumeStore from '../stores/resume'; // Importação padrão
 
+
 const store = useResumeStore();
 
 onMounted(() => {
@@ -22,6 +23,48 @@ const downloadPdf = async () => {
         
         // Abrimos o link em uma nova aba para iniciar o download
         window.open(url, '_blank');
+    }
+};
+
+const selectTemplate = async (templateId: string) => {
+    try {
+        // 1. Pega o ID do currículo da Store
+        const id = store.resume.id;
+        
+        console.log(`Tentando mudar para o template: ${templateId}`);
+
+        // 2. PEGA O TOKEN DO NAVEGADOR (Correção do erro "token is not defined")
+        // Geralmente o token fica salvo com o nome 'token' ou 'auth_token'. 
+        // Vou tentar pegar os dois para garantir.
+        const token = localStorage.getItem('token') || localStorage.getItem('auth_token') || '';
+
+        // 3. FAZ A REQUISIÇÃO (Usando localhost para bater com o seu navegador)
+        const response = await fetch(`http://localhost:8000/api/resumes/${id}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'Authorization': `Bearer ${token}` // <--- Agora usa a variável correta
+            },
+            body: JSON.stringify({
+                template_id: templateId
+            })
+        });
+
+        // 4. VERIFICA SE O BACKEND ACEITOU
+        if (!response.ok) {
+            const erroBackend = await response.json();
+            console.error('Erro retornado pelo Laravel:', erroBackend);
+            throw new Error(`Erro: ${response.status}`);
+        }
+
+        // 5. SUCESSO: Atualiza a cor do botão na tela
+        store.resume.template_id = templateId;
+        console.log('Sucesso! Template atualizado.');
+
+    } catch (error) {
+        console.error("ERRO NO JAVASCRIPT:", error);
+        alert('Erro ao salvar. Abra o Console (F12) para ver o detalhe vermelho.');
     }
 };
 </script>
@@ -65,7 +108,30 @@ const downloadPdf = async () => {
         >
             ⬅ Voltar
         </button>
-        
+
+        <div class="flex gap-4 mb-6">
+            <button 
+                @click="selectTemplate('moderno-blue')" 
+                class="border p-2 rounded hover:bg-blue-100 flex flex-col items-center"
+                :class="{ 'ring-2 ring-blue-500': store.resume.template_id === 'moderno-blue' }"
+            >
+                <div class="w-16 h-20 bg-gray-200 mb-2 border-l-4 border-blue-600"></div>
+                <span class="text-sm font-bold">Moderno</span>
+            </button>
+
+            <button 
+                @click="selectTemplate('classico')" 
+                class="border p-2 rounded hover:bg-gray-100 flex flex-col items-center"
+                :class="{ 'ring-2 ring-black': store.resume.template_id === 'classico' }"
+            >
+                <div class="w-16 h-20 bg-white border border-gray-300 mb-2 flex flex-col items-center pt-2">
+                    <div class="w-10 h-1 bg-black mb-1"></div>
+                    <div class="w-12 h-0.5 bg-gray-400"></div>
+                </div>
+                <span class="text-sm font-bold">Clássico</span>
+            </button>
+        </div>
+
       </header>
 
       <div v-for="section in store.resume.sections" :key="section.id || section.order_index" class="mb-6 bg-white p-6 rounded-lg shadow-sm border border-gray-200">
@@ -78,6 +144,7 @@ const downloadPdf = async () => {
                 🗑️ Remover
             </button>
         </div>
+
 
         <div v-if="section.type === 'personal'" class="grid grid-cols-1 gap-4">
             <div><label class="label-padrao">Nome Completo</label><input v-model="section.content.full_name" type="text" class="input-padrao"></div>
